@@ -30,13 +30,13 @@ public class SimpleAnimation extends AppCompatActivity {
 
     private GroupAnimator createAnimator(View view) {
         return new GroupAnimator()
-                .usingTarget(view)
-                .usingDuration(1000)
+                .withTarget(view)
+                .withDuration(1000)
                 .rotation(360)
-                .usingTiming(1000, 1000)
+                .withDurationAfter(1000)
                 .translationX(100)
                 .alpha(0f)
-                .usingTiming(500, 1500)
+                .withTimingAfter(500, -500)
                 .scaleX(0)
                 .scaleY(0);
     }

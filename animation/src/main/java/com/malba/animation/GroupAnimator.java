@@ -48,13 +48,13 @@ public class GroupAnimator {
     private int mAnimationLength = 0;
 
     // The time when the animation was started at.
-    private long mStartTime;
+    private long mPlaybackStartTime;
 
     /**
      * @return The estimated animation percent, after calling start().
      */
     public float getAnimationPercent() {
-        final long elapsedTime = System.currentTimeMillis() - mStartTime;
+        final long elapsedTime = System.currentTimeMillis() - mPlaybackStartTime;
         final float percent = elapsedTime / (float) mAnimationLength;
 
         if(percent > 1) {
@@ -328,7 +328,7 @@ public class GroupAnimator {
             }
         }
 
-        mStartTime = System.currentTimeMillis() - startTime;
+        mPlaybackStartTime = System.currentTimeMillis() - startTime;
     }
 
     /**
@@ -407,7 +407,7 @@ public class GroupAnimator {
      * @param delay Default animation delay.
      * @return This AnimationState instance.
      */
-    public GroupAnimator usingTiming(int duration, int delay) {
+    public GroupAnimator withTiming(int duration, int delay) {
         mDefaultDuration = duration;
         mDefaultDelay = delay;
         return this;
@@ -418,7 +418,7 @@ public class GroupAnimator {
      * @param duration Default animation duration.
      * @return This AnimationState instance.
      */
-    public GroupAnimator usingDuration(int duration) {
+    public GroupAnimator withDuration(int duration) {
         mDefaultDuration = duration;
         return this;
     }
@@ -434,11 +434,47 @@ public class GroupAnimator {
     }
 
     /**
+     * Sets the timing, such that the provided duration and delay will happen after the
+     * previous animation.
+     * @param duration The duration of the animation to play.
+     * @param delay The amount of time to delay after the previous animation.
+     * @return This AnimationState instance.
+     */
+    public GroupAnimator withTimingAfter(int duration, int delay) {
+        mDefaultDelay = mDefaultDelay + mDefaultDuration + delay;
+        mDefaultDuration = duration;
+        return this;
+    }
+
+    /**
+     * Sets the duration, will automatically set the delay such that this animation plays after the
+     * previous animation.
+     * @param duration The duration of the animation to play.
+     * @return This AnimationState instance.
+     */
+    public GroupAnimator withDurationAfter(int duration) {
+        withTimingAfter(duration, 0);
+        return this;
+    }
+
+    /**
+     * Sets the delay, will automatically set the delay to happen after the previous animation has
+     * played. For example, if the first animation has a playtime of 500ms and a delay of 500ms.
+     * Then setting the delay here to 500ms will have a true delay of 1500ms.
+     * @param delay The amount of time to delay after the previous animation.
+     * @return This AnimationState instance.
+     */
+    public GroupAnimator withDelayAfter(int delay) {
+        withTimingAfter(mDefaultDuration, delay);
+        return this;
+    }
+
+    /**
      * Sets a view to be the target of the commands following this.
      * @param view The view to animate.
      * @return This AnimationState instance.
      */
-    public GroupAnimator usingTarget(View view) {
+    public GroupAnimator withTarget(View view) {
         mTarget = view;
         return this;
     }
