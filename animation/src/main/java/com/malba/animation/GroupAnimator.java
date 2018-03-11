@@ -1,56 +1,32 @@
 package com.malba.animation;
-import android.animation.Animator;
 import android.support.annotation.NonNull;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.view.ViewPropertyAnimator;
+
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Created by malba on 3/7/2018.
+ * TBD
  */
-
 public class GroupAnimator {
-    // The root ViewGroup to play the animation on.
-    private ViewGroup mRootGroup;
-
-    /**
-     * Checks if the child is a descendant of the root view group.
-     * @param child The child to check against the root view group.
-     * @return True if the child is a descendant of the root view group.
-     */
-    private boolean isChildDescendant(View child) {
-        if(child == mRootGroup) {
-            return true;
-        }
-
-        ViewParent parent;
-        while((parent = child.getParent()) != null) {
-            if(parent == mRootGroup) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    static final int TRANSLATION_X  = 0x0001;
-    static final int TRANSLATION_Y  = 0x0002;
-    static final int TRANSLATION_Z  = 0x0004;
-    static final int SCALE_X        = 0x0008;
-    static final int SCALE_Y        = 0x0010;
-    static final int ROTATION       = 0x0020;
-    static final int ROTATION_X     = 0x0040;
-    static final int ROTATION_Y     = 0x0080;
-    static final int X              = 0x0100;
-    static final int Y              = 0x0200;
-    static final int Z              = 0x0400;
-    static final int ALPHA          = 0x0800;
+    // Static a animator definitions, so we can map the animations to Android animators.
+    private static final int TRANSLATION_X  = 0x0001;
+    private static final int TRANSLATION_Y  = 0x0002;
+    private static final int TRANSLATION_Z  = 0x0004;
+    private static final int SCALE_X        = 0x0008;
+    private static final int SCALE_Y        = 0x0010;
+    private static final int ROTATION       = 0x0020;
+    private static final int ROTATION_X     = 0x0040;
+    private static final int ROTATION_Y     = 0x0080;
+    private static final int X              = 0x0100;
+    private static final int Y              = 0x0200;
+    private static final int Z              = 0x0400;
+    private static final int ALPHA          = 0x0800;
 
     // Hash map to keep track of the animation states of various views.
     private HashMap<View, TreeSet<AnimationValue>> mAnimatorMap = new HashMap<>();
@@ -67,6 +43,61 @@ public class GroupAnimator {
 
     // The default delay to be used, unless a delay is specified.
     private int mDefaultDelay = 0;
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        super.clone();
+        GroupAnimator clone  = new GroupAnimator();
+        return clone;
+    }
+
+    /**
+     * Internal animation value class to keep track of a specific animation.
+     */
+    private class AnimationValue implements Comparable<AnimationValue> {
+        final int mProperty;
+        final int mDuration;
+        final int mStartDelay;
+        final float mValue;
+
+        /**
+         * @param property The property being animated.
+         * @param value The value being animated to.
+         * @param duration The duration the animation will last.
+         * @param startDelay The start delay of the animation.--
+         */
+        public AnimationValue(int property, float value, int duration, int startDelay) {
+            mProperty = property;
+            mValue = value;
+            mDuration = duration;
+            mStartDelay = startDelay;
+        }
+
+        /**
+         * @return Gets the total duration of this animation.
+         */
+        private int getTotalDuration() {
+            return mStartDelay + mDuration;
+        }
+
+        @Override
+        public int compareTo(@NonNull AnimationValue other) {
+            // Build the arrays with the ordered properties to compare.
+            int[] thisCompare = {this.getTotalDuration(), this.mStartDelay, this.mDuration, this.mProperty};
+            int[] otherCompare = {other.getTotalDuration(), other.mStartDelay, other.mDuration, other.mProperty};
+
+            // Compare against all properties.
+            for(int i=0; i < thisCompare.length; i++) {
+                final int compareValue = Integer.compare(thisCompare[i], otherCompare[i]);
+                if (compareValue != 0) {
+                    return compareValue;
+                }
+            }
+
+            // Items are completely equal.
+            return 0;
+        }
+    }
 
     /**
      * Registers a property for animation
@@ -106,8 +137,9 @@ public class GroupAnimator {
      * Starts the provided animations, given a view.
      * @param view The view to animate on.
      * @param animations The animations defined upon the view.
+     * @return A ViewPropertyanimator, if any animations were started.
      */
-    private void startAnimations(View view, TreeSet<AnimationValue> animations) {
+    private ViewPropertyAnimator startAnimation(View view, TreeSet<AnimationValue> animations) {
         AnimationValue prevValue = null;
         ViewPropertyAnimator animator = view.animate();
 
@@ -130,9 +162,48 @@ public class GroupAnimator {
         // Start the final piece of the animation, so long as we had something animated.
         if(prevValue != null) {
             System.out.println("Starting animation batch");
-            mActiveAnimators.add(animator);
             animator.start();
+            return animator;
         }
+
+        return null;
+    }
+
+    /**
+     * Gets the value for a particular animatable property.
+     * @param view The view to grab the value for.
+     * @param propertyConstant The property being fetched.
+     * @return The value of the property being fetched.
+     */
+    private float getValue(View view, int propertyConstant) {
+        switch (propertyConstant) {
+            case TRANSLATION_X:
+                return view.getTranslationX();
+            case TRANSLATION_Y:
+                return view.getTranslationY();
+            case TRANSLATION_Z:
+                return view.getTranslationZ();
+            case ROTATION:
+                return view.getRotation();
+            case ROTATION_X:
+                return view.getRotationX();
+            case ROTATION_Y:
+                return view.getRotationY();
+            case SCALE_X:
+                return view.getScaleX();
+            case SCALE_Y:
+                return view.getScaleY();
+            case X:
+                return view.getLeft() + view.getTranslationX();
+            case Y:
+                return view.getTop() + view.getTranslationY();
+            case Z:
+                return view.getElevation() + view.getTranslationZ();
+            case ALPHA:
+                return view.getAlpha();
+        }
+
+        return 0;
     }
 
     /**
@@ -185,61 +256,69 @@ public class GroupAnimator {
     }
 
     /**
-     * Internal animation value class to keep track of a specific animation.
-     */
-    private class AnimationValue implements Comparable<AnimationValue> {
-        final int mProperty;
-        final int mDuration;
-        final int mStartDelay;
-        final float mValue;
-
-        /**
-         * @param property The property being animated.
-         * @param value The value being animated to.
-         * @param duration The duration the animation will last.
-         * @param startDelay The start delay of the animation.--
-         */
-        public AnimationValue(int property, float value, int duration, int startDelay) {
-            mProperty = property;
-            mValue = value;
-            mDuration = duration;
-            mStartDelay = startDelay;
-        }
-
-        /**
-         * @return Gets the total duration of this animation.
-         */
-        private int getTotalDuration() {
-            return mStartDelay + mDuration;
-        }
-
-        @Override
-        public int compareTo(@NonNull AnimationValue other) {
-            // Build the arrays with the ordered properties to compare.
-            int[] thisCompare = {this.getTotalDuration(), this.mStartDelay, this.mDuration, this.mProperty};
-            int[] otherCompare = {other.getTotalDuration(), other.mStartDelay, other.mDuration, other.mProperty};
-
-            // Compare against all properties.
-            for(int i=0; i < thisCompare.length; i++) {
-                final int compareValue = Integer.compare(thisCompare[i], otherCompare[i]);
-                if (compareValue != 0) {
-                    return compareValue;
-                }
-            }
-
-            // Items are completely equal.
-            return 0;
-        }
-    }
-
-    /**
      * Starts the animation sequence.
      */
     public void start() {
         Set<View> views = mAnimatorMap.keySet();
+
         for(View v : views) {
-            startAnimations(v, mAnimatorMap.get(v));
+            ViewPropertyAnimator animator = startAnimation(v, mAnimatorMap.get(v));
+            if(animator != null) {
+                mActiveAnimators.add(animator);
+            }
         }
+    }
+
+    /**
+     * Uses the currently defined animation set, to generate a new instance of GroupAnimator,
+     * which will have the animation reversed. The reverse values are captured based on the current
+     * view states.
+     * @return A cloned and reversed version of this GroupAnimator.
+     */
+    public GroupAnimator cloneReverse() {
+        GroupAnimator reverseAnimator = new GroupAnimator();
+
+        Set<View> views = mAnimatorMap.keySet();
+
+        for(View v : views) {
+            TreeSet<AnimationValue> animations = mAnimatorMap.get(v);
+            TreeSet<AnimationValue> reverseAnimations = getReverseAnimationSet(v, animations);
+            reverseAnimator.mAnimatorMap.put(v, reverseAnimations);
+        }
+
+        return reverseAnimator;
+    }
+
+    /**
+     * Returns a set of animators, which will play in the reverse direction. This method takes
+     * durations and start delays into account.
+     * @param view The view to pull the current property states from.
+     * @param animations The animation set to reverse.
+     * @return The reverse animation set.
+     */
+    private TreeSet<AnimationValue> getReverseAnimationSet(View view, TreeSet<AnimationValue> animations) {
+        if(animations != null && !animations.isEmpty()) {
+            TreeSet<AnimationValue> reverseAnimations = createAnimationStateSet();
+            Iterator<AnimationValue> iter = animations.descendingIterator();
+
+            int totalAnimationTime = animations.last().getTotalDuration();
+
+            while (iter.hasNext()) {
+                AnimationValue value = iter.next();
+                AnimationValue reverse = new AnimationValue(
+                        value.mProperty,
+                        getValue(view, value.mProperty),
+                        value.mDuration,
+                        totalAnimationTime - value.getTotalDuration()
+                );
+
+                reverseAnimations.add(reverse);
+            }
+
+            return reverseAnimations;
+        }
+
+        return null;
     }
 
     /**

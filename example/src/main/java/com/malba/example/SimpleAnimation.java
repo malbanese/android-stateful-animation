@@ -9,6 +9,9 @@ import com.malba.animation.GroupAnimator;
 public class SimpleAnimation extends AppCompatActivity {
     private View mButton;
     private int mAnimationState;
+    private GroupAnimator mAnimator;
+    private GroupAnimator mReverseAnimator;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -20,36 +23,34 @@ public class SimpleAnimation extends AppCompatActivity {
                 animateView(view);
             }
         });
+
+        mAnimator = createAnimator(mButton);
+        mReverseAnimator = mAnimator.cloneReverse();
+    }
+
+    private GroupAnimator createAnimator(View view) {
+        return new GroupAnimator()
+                .usingTarget(view)
+                .usingDuration(1000)
+                .rotation(360)
+                .usingTiming(1000, 1000)
+                .translationX(100)
+                .alpha(0f)
+                .usingTiming(500, 1500)
+                .scaleX(0)
+                .scaleY(0);
     }
 
     private void animateView(View view) {
-        GroupAnimator animator = new GroupAnimator();
+        if(mAnimator == null) {
+            mAnimator = new GroupAnimator();
+        }
 
         if(mAnimationState == 0) {
-            animator
-                    .usingTarget(view)
-                    .usingDuration(1000)
-                    .rotation(360)
-                    .usingTiming(1000, 1000)
-                    .translationX(100)
-                    .alpha(0f)
-                    .usingTiming(500, 1500)
-                    .scaleX(0)
-                    .scaleY(0)
-                    .start();
+            mAnimator.start();
             mAnimationState = 1;
         } else {
-            animator
-                    .usingTarget(view)
-                    .usingDuration(500)
-                    .scaleX(1)
-                    .scaleY(1)
-                    .usingDuration(1000)
-                    .alpha(1)
-                    .translationX(0)
-                    .usingTiming(1000, 1000)
-                    .rotation(0)
-                    .start();
+            mReverseAnimator.start();
             mAnimationState = 0;
         }
     }
