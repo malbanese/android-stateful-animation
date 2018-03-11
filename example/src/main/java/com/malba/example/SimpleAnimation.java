@@ -42,15 +42,13 @@ public class SimpleAnimation extends AppCompatActivity {
     }
 
     private void animateView(View view) {
-        if(mAnimator == null) {
-            mAnimator = new GroupAnimator();
-        }
-
         if(mAnimationState == 0) {
-            mAnimator.start();
+            mReverseAnimator.cancel();
+            mAnimator.start(1 - mReverseAnimator.getAnimationPercent());
             mAnimationState = 1;
         } else {
-            mReverseAnimator.start();
+            mAnimator.cancel();
+            mReverseAnimator.start(1 - mAnimator.getAnimationPercent());
             mAnimationState = 0;
         }
     }

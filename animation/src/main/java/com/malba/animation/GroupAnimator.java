@@ -44,6 +44,30 @@ public class GroupAnimator {
     // The default delay to be used, unless a delay is specified.
     private int mDefaultDelay = 0;
 
+    // The length of the animation that will play.
+    private int mAnimationLength = 0;
+
+    // The time when the animation was started at.
+    private long mStartTime;
+
+    /**
+     * @return The estimated animation percent, after calling start().
+     */
+    public float getAnimationPercent() {
+        final long elapsedTime = System.currentTimeMillis() - mStartTime;
+        final float percent = elapsedTime / (float) mAnimationLength;
+
+        if(percent > 1) {
+            return 1;
+        }
+
+        if(percent < 0) {
+            return 0;
+        }
+
+        return percent;
+    }
+
     @Override
     protected Object clone() throws CloneNotSupportedException {
         super.clone();
@@ -83,8 +107,8 @@ public class GroupAnimator {
         @Override
         public int compareTo(@NonNull AnimationValue other) {
             // Build the arrays with the ordered properties to compare.
-            int[] thisCompare = {this.getTotalDuration(), this.mStartDelay, this.mDuration, this.mProperty};
-            int[] otherCompare = {other.getTotalDuration(), other.mStartDelay, other.mDuration, other.mProperty};
+            int[] thisCompare = {this.mStartDelay, this.mDuration, this.mProperty};
+            int[] otherCompare = {other.mStartDelay, other.mDuration, other.mProperty};
 
             // Compare against all properties.
             for(int i=0; i < thisCompare.length; i++) {
@@ -116,7 +140,13 @@ public class GroupAnimator {
         }
 
         System.out.println("Adding property");
-        set.add( new AnimationValue(property, value, duration, startDelay) );
+        AnimationValue animationValue = new AnimationValue(property, value, duration, startDelay);
+
+        if(animationValue.getTotalDuration() > mAnimationLength) {
+            mAnimationLength = animationValue.getTotalDuration();
+        }
+
+        set.add(animationValue);
     }
 
     /**
@@ -137,10 +167,17 @@ public class GroupAnimator {
      * Starts the provided animations, given a view.
      * @param view The view to animate on.
      * @param animations The animations defined upon the view.
+     * @param startTime The start time to start at.
      * @return A ViewPropertyanimator, if any animations were started.
      */
-    private ViewPropertyAnimator startAnimation(View view, TreeSet<AnimationValue> animations) {
+    private ViewPropertyAnimator startAnimation(View view, TreeSet<AnimationValue> animations, int startTime) {
+        // Keep track of t he previous value, to know when to start an animation.
         AnimationValue prevValue = null;
+
+        // Reset just after an animator has been started, so we know to setup the next one.
+        boolean setupAnimator = false;
+
+        // View property animator to operate on.
         ViewPropertyAnimator animator = view.animate();
 
         System.out.println("Animating property count " + animations.size());
@@ -151,12 +188,34 @@ public class GroupAnimator {
             // set up this one.
             if (prevValue != null && (prevValue.mStartDelay != value.mStartDelay || prevValue.mDuration != value.mDuration)) {
                 System.out.println("Starting animation batch");
+                setupAnimator = false;
                 animator.start();
             }
 
-            System.out.println("Animating value " + value.mProperty + " " + value.mStartDelay + " " + value.mDuration);
-            animateValue(animator, value);
-            prevValue = value;
+            // Only process this animation, if the total duration is greater than the start time.
+            if(value.getTotalDuration() > startTime) {
+                // Set up the initial animator.
+                if (!setupAnimator) {
+
+                    final int delay, duration;
+                    if(startTime > value.mStartDelay) {
+                        delay = 0;
+                        duration = value.getTotalDuration() - startTime;
+                    } else {
+                        delay = value.mStartDelay - startTime;
+                        duration = value.mDuration;
+                    }
+
+                    System.out.println("Duration " + duration + " | Delay " + delay);
+                    animator.setDuration(duration);
+                    animator.setStartDelay(delay);
+                    setupAnimator = true;
+                }
+
+                System.out.println("Animating value " + value.mProperty + " " + value.mValue);
+                animateValue(animator, value);
+                prevValue = value;
+            }
         }
 
         // Start the final piece of the animation, so long as we had something animated.
@@ -212,9 +271,6 @@ public class GroupAnimator {
      * @param value The AnimationValue instance to animate with.
      */
     private void animateValue(ViewPropertyAnimator animator, AnimationValue value) {
-        animator.setDuration(value.mDuration);
-        animator.setStartDelay(value.mStartDelay);
-
         switch (value.mProperty) {
             case TRANSLATION_X:
                 animator.translationX(value.mValue);
@@ -257,16 +313,29 @@ public class GroupAnimator {
 
     /**
      * Starts the animation sequence.
+     * @param startPercent The animation percent to start at.
      */
-    public void start() {
-        Set<View> views = mAnimatorMap.keySet();
+    public void start(float startPercent) {
+        int startTime = (int) (startPercent * mAnimationLength);
 
+        System.out.println("Start time " + startTime);
+
+        Set<View> views = mAnimatorMap.keySet();
         for(View v : views) {
-            ViewPropertyAnimator animator = startAnimation(v, mAnimatorMap.get(v));
+            ViewPropertyAnimator animator = startAnimation(v, mAnimatorMap.get(v), startTime);
             if(animator != null) {
                 mActiveAnimators.add(animator);
             }
         }
+
+        mStartTime = System.currentTimeMillis() - startTime;
+    }
+
+    /**
+     * Starts the animation sequence.
+     */
+    public void start() {
+        start(0);
     }
 
     /**
@@ -277,9 +346,9 @@ public class GroupAnimator {
      */
     public GroupAnimator cloneReverse() {
         GroupAnimator reverseAnimator = new GroupAnimator();
+        reverseAnimator.mAnimationLength = mAnimationLength;
 
         Set<View> views = mAnimatorMap.keySet();
-
         for(View v : views) {
             TreeSet<AnimationValue> animations = mAnimatorMap.get(v);
             TreeSet<AnimationValue> reverseAnimations = getReverseAnimationSet(v, animations);
@@ -301,7 +370,7 @@ public class GroupAnimator {
             TreeSet<AnimationValue> reverseAnimations = createAnimationStateSet();
             Iterator<AnimationValue> iter = animations.descendingIterator();
 
-            int totalAnimationTime = animations.last().getTotalDuration();
+            int totalAnimationTime = mAnimationLength;
 
             while (iter.hasNext()) {
                 AnimationValue value = iter.next();
